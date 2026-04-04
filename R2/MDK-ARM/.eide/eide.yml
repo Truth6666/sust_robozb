@@ -3,7 +3,8 @@ name: R2
 type: ARM
 deviceName: STM32F427IIHx
 packDir: .pack/Keil/STM32F4xx_DFP.2.17.1
-srcDirs: []
+srcDirs:
+  - ../User_Code
 virtualFolder:
   name: <virtual_root>
   files: []
@@ -14,6 +15,7 @@ virtualFolder:
         - name: MDK-ARM
           files:
             - path: startup_stm32f427xx.s
+            - path: compat_link_shims.cpp
           folders: []
         - name: User
           files: []
@@ -23,6 +25,8 @@ virtualFolder:
                 - path: ../Core/Src/main.c
                 - path: ../Core/Src/gpio.c
                 - path: ../Core/Src/can.c
+                - path: ../Core/Src/dma.c
+                - path: ../Core/Src/usart.c
                 - path: ../Core/Src/stm32f4xx_it.c
                 - path: ../Core/Src/stm32f4xx_hal_msp.c
               folders: []
@@ -45,6 +49,7 @@ virtualFolder:
             - path: ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.c
             - path: ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
             - path: ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_exti.c
+            - path: ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
           folders: []
         - name: CMSIS
           files:
@@ -69,8 +74,11 @@ targets:
         - ../Drivers/CMSIS/Include
         - .cmsis/include
         - RTE/_R2
+        - ../User_Code
       libList: []
     excludeList: []
+    settings:
+      debugger: cortex-debug
     toolchain: AC5
     toolchainConfigMap:
       AC5:
@@ -124,15 +132,15 @@ targets:
             - id: 1
               isChecked: true
               mem:
-                size: ""
-                startAddr: ""
+                size: "0x30000"
+                startAddr: "0x20000000"
               noInit: false
               tag: IRAM
             - id: 2
               isChecked: true
               mem:
-                size: "0x0"
-                startAddr: "0x0"
+                size: "0x10000"
+                startAddr: "0x10000000"
               noInit: false
               tag: IRAM
           ROM:
@@ -161,11 +169,11 @@ targets:
               isChecked: true
               isStartup: true
               mem:
-                size: ""
-                startAddr: ""
+                size: "0x200000"
+                startAddr: "0x08000000"
               tag: IROM
             - id: 2
-              isChecked: true
+              isChecked: false
               isStartup: false
               mem:
                 size: "0x0"
@@ -186,5 +194,5 @@ targets:
         baseAddr: "0x08000000"
         bin: ""
         interface: stlink
-        target: stm32f1x
+        target: stm32f4x
     uploader: OpenOCD

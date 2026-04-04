@@ -2,12 +2,12 @@
 *.exe
 
 # KeilIDE编辑器忽略项
-**/MDK-ARM/*
+#**/MDK-ARM/*
 
 # 不忽略Keil工程配置文件
-!**/MDK-ARM/*.uvoptx
-!**/MDK-ARM/*.uvprojx
-!**/MDK-ARM/startup_*.s
+#!**/MDK-ARM/*.uvoptx
+#!**/MDK-ARM/*.uvprojx
+#!**/MDK-ARM/startup_*.s
 
 # armgcc-cmake工程忽略项
 **/cmake-build-debug/*

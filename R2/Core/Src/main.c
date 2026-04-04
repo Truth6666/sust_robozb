@@ -1,33 +1,40 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2026 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "can.h"
+#include "dma.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "1_Middleware/1_Driver/BSP/drv_djiboarda.h"
+#include "1_Middleware/1_Driver/CAN/drv_can.h"
+#include "1_Middleware/1_Driver/UART/drv_uart.h"
+// #include "2_Device/Serialplot/dvc_serialplot.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+// Class_Serialplot Serialplot;
 
 /* USER CODE END PTD */
 
@@ -44,17 +51,60 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+float UART2_Tx_Data[2];
+uint8_t rx_Buffer[10];
 
+// int16_t Rx_Encoder, Rx_Omega, Rx_Torque, Rx_Temperature;
+// float Tx_Encoder, Tx_Omega, Tx_Torque, Tx_Temperature;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+/**
+ * @brief HAL库UART接收DMA空闲中断
+ *
+ * @param huart UART编号
+ * @param Size 长度
+ */
+void Serialplot_Call_Back(uint8_t *Buffer, uint16_t Length)
+{
+  if (Buffer == NULL || Length < 1)
+  {
+    return;
+  }
 
+  if (Buffer[0] == 00)
+  {
+    BSP_Set_LED_1(BSP_LED_Status_DISABLED);
+  }
+  else if (Buffer[0] == 01)
+  {
+    BSP_Set_LED_1(BSP_LED_Status_ENABLED);
+  }
+  else if (Buffer[0] == 02)
+  {
+    HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_1);
+    float rx_cmd = (float)Buffer[0];
+    UART_Send_JustFloat(&UART2_Manage_Object, &rx_cmd, 1);
+  }
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+// void CAN_Motor_Call_Back(Struct_CAN_Rx_Buffer *Rx_Buffer)
+// {
+//   uint8_t *Rx_Data = Rx_Buffer->Data;
+//   if (Rx_Buffer->Header.StdId == 0x204)
+//   {
+//     Rx_Encoder = (Rx_Data[0] << 8) | Rx_Data[1];
+//     Rx_Omega = (Rx_Data[2] << 8) | Rx_Data[3];
+//     Rx_Torque = (Rx_Data[4] << 8) | Rx_Data[5];
+//     Rx_Temperature = (Rx_Data[6] << 8) | Rx_Data[7];
+//   }
+// }
 
 /* USER CODE END 0 */
 
@@ -76,6 +126,9 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
+  // UART_Init(&huart2, NULL, 0);
+  // Serialplot.Init(&huart2, Serialplot_Checksum_8_ENABLE, 0, NULL, Serialplot_Data_Type_FLOAT);
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -87,15 +140,21 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CAN1_Init();
+  MX_USART2_UART_Init();
+  MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
-
+  BSP_Init(BSP_DC24_LU_ON | BSP_DC24_LD_ON | BSP_DC24_RU_ON | BSP_DC24_RD_ON | BSP_LED_1_ON);
+  UART_Init(&huart2, Serialplot_Call_Back, 10);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

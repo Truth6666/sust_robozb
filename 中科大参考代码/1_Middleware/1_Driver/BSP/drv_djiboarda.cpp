@@ -280,7 +280,7 @@ void BSP_Set_DC24_LD(Enum_BSP_DC24_Status Status)
     HAL_GPIO_WritePin(GPIOH, GPIO_PIN_4, static_cast<GPIO_PinState>(Status));
 }
 
-/**
+
  * @brief 设定右上角DC24
  *
  * @param Status 状态

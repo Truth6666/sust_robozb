@@ -1,4 +1,4 @@
-/**
+ /**
  * @file drv_boarda_mpu6500.h
  * @author yssickjgd (1345578933@qq.com)
  * @brief A板的板级支持包
