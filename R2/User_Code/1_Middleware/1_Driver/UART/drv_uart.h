@@ -73,4 +73,32 @@ void TIM_1ms_UART_PeriodElapsedCallback();
 
 #endif
 
+// /**
+//  * @brief HAL库UART接收DMA空闲中断示例函数
+//  *
+//  * @param huart UART编号
+//  * @param Size 长度
+//  */
+// void Serialplot_Call_Back(uint8_t *Buffer, uint16_t Length)
+// {
+//     if (Buffer == NULL || Length < 1)
+//     {
+//         return;
+//     }
+
+//     if (Buffer[0] == 00)
+//     {
+//         BSP_Set_LED_1(BSP_LED_Status_DISABLED);
+//     }
+//     else if (Buffer[0] == 01)
+//     {
+//         BSP_Set_LED_1(BSP_LED_Status_ENABLED);
+//     }
+//     else if (Buffer[0] == 02)
+//     {
+//         HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_1);
+//         float rx_cmd = (float)Buffer[0];
+//         UART_Send_JustFloat(&UART2_Manage_Object, &rx_cmd, 1);
+//     }
+// }
 /************************ COPYRIGHT(C) USTC-ROBOWALKER **************************/
