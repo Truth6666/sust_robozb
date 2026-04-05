@@ -217,11 +217,11 @@ void TIM_1ms_CAN_PeriodElapsedCallback()
  */
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-    // 判断程序初始化完成
-    if (init_finished == false)
-    {
-        return;
-    }
+    // // 判断程序初始化完成
+    // if (init_finished == false)
+    // {
+    //     return;
+    // }
 
     // 选择回调函数
     if (hcan->Instance == CAN1)
@@ -249,11 +249,11 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
  */
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-    // 判断程序初始化完成
-    if (init_finished == false)
-    {
-        return;
-    }
+    // // 判断程序初始化完成
+    // if (init_finished == false)
+    // {
+    //     return;
+    // }
 
     // 选择回调函数
     if (hcan->Instance == CAN1)

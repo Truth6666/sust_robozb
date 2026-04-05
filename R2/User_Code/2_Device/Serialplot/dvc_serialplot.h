@@ -59,12 +59,11 @@ enum Enum_Serialplot_Data_Type
 class Class_Serialplot
 {
 public:
-    void Init(
-        UART_HandleTypeDef *huart,
-        Enum_Serialplot_Checksum_8 __Checksum_8 = Serialplot_Checksum_8_ENABLE,
-        uint8_t __Rx_Variable_Assignment_Num = 0,
-        char **__Rx_Variable_Assignment_List = NULL,
-        Enum_Serialplot_Data_Type __Data_Type = Serialplot_Data_Type_FLOAT);
+    void Init(UART_HandleTypeDef *huart,
+              Enum_Serialplot_Checksum_8 __Checksum_8 = Serialplot_Checksum_8_ENABLE,
+              uint8_t __Rx_Variable_Assignment_Num = 0,
+              char **__Rx_Variable_Assignment_List = NULL,
+              Enum_Serialplot_Data_Type __Data_Type = Serialplot_Data_Type_FLOAT);
 
     inline int8_t Get_Variable_Index();
 
@@ -75,6 +74,8 @@ public:
     void UART_RxCpltCallback(uint8_t *Rx_Data, uint16_t Length);
 
     void TIM_1ms_Write_PeriodElapsedCallback();
+
+    uint8_t JustFloat_Output();
 
 protected:
     // 初始化相关常量
@@ -156,7 +157,7 @@ inline void Class_Serialplot::Set_Data(uint8_t Number, ...)
     va_start(data_ptr, Number);
     for (int i = 0; i < Number; i++)
     {
-        Data[i] = (void *)va_arg(data_ptr, int);
+        Data[i] = (void *)va_arg(data_ptr, void *);
     }
     va_end(data_ptr);
     Data_Number = Number;

@@ -4,6 +4,7 @@
  * @brief 串口绘图
  * @version 0.1
  * @date 2023-08-29 0.1 23赛季定稿
+ * @date 2026.3.29 0.2 去除帧头标,适配vofa+串口调试软件
  *
  * @copyright USTC-RoboWalker (c) 2023
  *
@@ -31,12 +32,11 @@
  * @param __Rx_Variable_Assignment_List 接收指令字典列表
  * @param __Data_Type 传输数据类型, 默认float
  */
-void Class_Serialplot::Init(
-    UART_HandleTypeDef *huart,
-    Enum_Serialplot_Checksum_8 __Checksum_8,
-    uint8_t __Rx_Variable_Assignment_Num,
-    char **__Rx_Variable_Assignment_List,
-    Enum_Serialplot_Data_Type __Data_Type)
+void Class_Serialplot::Init(UART_HandleTypeDef *huart,
+                            Enum_Serialplot_Checksum_8 __Checksum_8,
+                            uint8_t __Rx_Variable_Assignment_Num,
+                            char **__Rx_Variable_Assignment_List,
+                            Enum_Serialplot_Data_Type __Data_Type)
 {
     if (huart->Instance == USART1)
     {
@@ -158,6 +158,50 @@ void Class_Serialplot::TIM_1ms_Write_PeriodElapsedCallback()
 }
 
 /**
+ * @brief 按VOFA+ JustFloat协议发送浮点通道数据
+ *
+ * 协议格式: Set_Data注册的float数组(小端) + 0x00 0x00 0x80 0x7f
+ *
+ * @return uint8_t HAL状态
+ */
+uint8_t Class_Serialplot::JustFloat_Output()
+{
+    if (UART_Manage_Object == NULL || Data_Number == 0)
+    {
+        return HAL_ERROR;
+    }
+
+    // Set_Data中注册的数据按float通道进行打包
+    uint16_t payload_length = Data_Number * sizeof(float);
+    // 协议长度 = payload + JustFloat帧尾(4B)
+    uint16_t frame_length = payload_length + 4;
+
+    if (frame_length > UART_BUFFER_SIZE)
+    {
+        return HAL_ERROR;
+    }
+
+    uint8_t *tmp_buffer = UART_Manage_Object->Tx_Buffer;
+    memset(tmp_buffer, 0, UART_BUFFER_SIZE);
+
+    // 1) 填充float通道数据
+    for (uint8_t i = 0; i < Data_Number; i++)
+    {
+        memcpy(tmp_buffer + i * sizeof(float), Data[i], sizeof(float));
+    }
+
+    // 2) 添加JustFloat帧尾: 0x00 0x00 0x80 0x7f
+    tmp_buffer[payload_length + 0] = 0x00;
+    tmp_buffer[payload_length + 1] = 0x00;
+    tmp_buffer[payload_length + 2] = 0x80;
+    tmp_buffer[payload_length + 3] = 0x7f;
+
+    // 3) 使用中断方式发送
+    HAL_StatusTypeDef hal_ret = HAL_UART_Transmit_IT(UART_Manage_Object->UART_Handler, UART_Manage_Object->Tx_Buffer, frame_length);
+    return (uint8_t)hal_ret;
+}
+
+/**
  * @brief 数据处理过程
  * @param Length 接收数据长度
  */
@@ -260,7 +304,8 @@ void Class_Serialplot::_Judge_Variable_Value(uint16_t Length, int flag)
 void Class_Serialplot::Output()
 {
     uint8_t *tmp_buffer = UART_Manage_Object->Tx_Buffer;
-
+    
+    //清除发送缓冲区
     memset(tmp_buffer, 0, UART_BUFFER_SIZE);
 
     // 填充数据

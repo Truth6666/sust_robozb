@@ -28,7 +28,7 @@
 #include "1_Middleware/1_Driver/BSP/drv_djiboarda.h"
 #include "1_Middleware/1_Driver/CAN/drv_can.h"
 #include "1_Middleware/1_Driver/UART/drv_uart.h"
-// #include "2_Device/Serialplot/dvc_serialplot.h"
+#include "2_Device/Serialplot/dvc_serialplot.h"
 
 /* USER CODE END Includes */
 
@@ -51,67 +51,40 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-float UART2_Tx_Data[2];
-uint8_t rx_Buffer[10];
+Class_Serialplot serialplot;
 
-// int16_t Rx_Encoder, Rx_Omega, Rx_Torque, Rx_Temperature;
-// float Tx_Encoder, Tx_Omega, Tx_Torque, Tx_Temperature;
+int16_t Rx_Encoder, Rx_Omega, Rx_Torque, Rx_Temperature;
+float Tx_Encoder, Tx_Omega, Tx_Torque, Tx_Temperature;
+float Encoder=1, Omega=2, Torque=3, Temperature=4;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-/**
- * @brief HAL库UART接收DMA空闲中断
- *
- * @param huart UART编号
- * @param Size 长度
- */
-void Serialplot_Call_Back(uint8_t *Buffer, uint16_t Length)
-{
-  if (Buffer == NULL || Length < 1)
-  {
-    return;
-  }
 
-  if (Buffer[0] == 00)
-  {
-    BSP_Set_LED_1(BSP_LED_Status_DISABLED);
-  }
-  else if (Buffer[0] == 01)
-  {
-    BSP_Set_LED_1(BSP_LED_Status_ENABLED);
-  }
-  else if (Buffer[0] == 02)
-  {
-    HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_1);
-    float rx_cmd = (float)Buffer[0];
-    UART_Send_JustFloat(&UART2_Manage_Object, &rx_cmd, 1);
-  }
-}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-// void CAN_Motor_Call_Back(Struct_CAN_Rx_Buffer *Rx_Buffer)
-// {
-//   uint8_t *Rx_Data = Rx_Buffer->Data;
-//   if (Rx_Buffer->Header.StdId == 0x204)
-//   {
-//     Rx_Encoder = (Rx_Data[0] << 8) | Rx_Data[1];
-//     Rx_Omega = (Rx_Data[2] << 8) | Rx_Data[3];
-//     Rx_Torque = (Rx_Data[4] << 8) | Rx_Data[5];
-//     Rx_Temperature = (Rx_Data[6] << 8) | Rx_Data[7];
-//   }
-// }
+void CAN_Motor_Call_Back(Struct_CAN_Rx_Buffer *Rx_Buffer)
+{
+  uint8_t *Rx_Data = Rx_Buffer->Data;
+  if (Rx_Buffer->Header.StdId == 0x204)
+  {
+    Rx_Encoder = (Rx_Data[0] << 8) | Rx_Data[1];
+    Rx_Omega = (Rx_Data[2] << 8) | Rx_Data[3];
+    Rx_Torque = (Rx_Data[4] << 8) | Rx_Data[5];
+    Rx_Temperature = (Rx_Data[6] << 8) | Rx_Data[7];
+  }
+}
 
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief  The application entry point.
+ * @retval int
+ */
 int main(void)
 {
 
@@ -145,15 +118,27 @@ int main(void)
   MX_USART2_UART_Init();
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
-  BSP_Init(BSP_DC24_LU_ON | BSP_DC24_LD_ON | BSP_DC24_RU_ON | BSP_DC24_RD_ON | BSP_LED_1_ON);
-  UART_Init(&huart2, Serialplot_Call_Back, 10);
+  BSP_Init(BSP_DC24_LU_ON | BSP_DC24_LD_ON | BSP_DC24_RU_ON | BSP_DC24_RD_ON);
+  CAN_Init(&hcan1, CAN_Motor_Call_Back);
+  UART_Init(&huart2, NULL, 0);
+  can_filter_mask_config(&hcan1, CAN_FILTER(13) | CAN_FIFO_1 | CAN_STDID | CAN_DATA_TYPE, 0x204, 0x7ff);
+
+  serialplot.Init(&huart2);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    
+    Tx_Encoder = Rx_Encoder;
+    Tx_Omega = Rx_Omega;
+    Tx_Torque = Rx_Torque;
+    Tx_Temperature = Rx_Temperature;
+    serialplot.Set_Data(4, &Tx_Encoder, &Tx_Omega, &Tx_Torque, &Tx_Temperature);
+    serialplot.JustFloat_Output();
+
+    HAL_Delay(0);
 
     /* USER CODE END WHILE */
 
@@ -163,22 +148,22 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-  */
+   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
+   * in the RCC_OscInitTypeDef structure.
+   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -193,16 +178,15 @@ void SystemClock_Config(void)
   }
 
   /** Activate the Over-Drive mode
-  */
+   */
   if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+   */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
@@ -219,9 +203,9 @@ void SystemClock_Config(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -234,12 +218,12 @@ void Error_Handler(void)
 }
 #ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
