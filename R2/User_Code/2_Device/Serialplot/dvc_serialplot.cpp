@@ -28,6 +28,7 @@
  * @brief 串口绘图初始化
  *
  * @param __huart 指定的UART
+ * @param __Checksum_8 是否启用8位校验和, 默认不启用
  * @param __Rx_Variable_Assignment_Num 接收指令字典的数量
  * @param __Rx_Variable_Assignment_List 接收指令字典列表
  * @param __Data_Type 传输数据类型, 默认float
@@ -81,6 +82,7 @@ void Class_Serialplot::Init(UART_HandleTypeDef *huart,
  * @brief UART通信接收回调函数
  *
  * @param Rx_Data 接收的数据
+ * @param Length 接收数据长度(字节数)
  */
 void Class_Serialplot::UART_RxCpltCallback(uint8_t *Rx_Data, uint16_t Length)
 {

@@ -29,6 +29,8 @@
 #include "1_Middleware/1_Driver/CAN/drv_can.h"
 #include "1_Middleware/1_Driver/UART/drv_uart.h"
 #include "2_Device/Serialplot/dvc_serialplot.h"
+#include "1_Middleware/2_Algorithm/PID/alg_pid.h"
+#include "2_Device/Motor/Motor_DJI/dvc_motor_dji.h"
 
 /* USER CODE END Includes */
 
@@ -52,10 +54,21 @@
 
 /* USER CODE BEGIN PV */
 Class_Serialplot serialplot;
+Class_Motor_DJI_C620 motor;
 
-int16_t Rx_Encoder, Rx_Omega, Rx_Torque, Rx_Temperature;
-float Tx_Encoder, Tx_Omega, Tx_Torque, Tx_Temperature;
-float Encoder=1, Omega=2, Torque=3, Temperature=4;
+float Target_Angle, Now_Angle, Target_Omega, Now_Omega;
+
+uint32_t Counter = 0;
+
+static char Variable_Assignment_List[][SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH] = {
+    // 电机调PID
+    "pa",
+    "ia",
+    "da",
+    "po",
+    "io",
+    "do",
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,24 +80,74 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/**
+ * @brief CAN报文回调函数
+ *
+ * @param Rx_Buffer CAN接收的信息结构体
+ */
 void CAN_Motor_Call_Back(Struct_CAN_Rx_Buffer *Rx_Buffer)
 {
-  uint8_t *Rx_Data = Rx_Buffer->Data;
-  if (Rx_Buffer->Header.StdId == 0x204)
+  switch (Rx_Buffer->Header.StdId)
   {
-    Rx_Encoder = (Rx_Data[0] << 8) | Rx_Data[1];
-    Rx_Omega = (Rx_Data[2] << 8) | Rx_Data[3];
-    Rx_Torque = (Rx_Data[4] << 8) | Rx_Data[5];
-    Rx_Temperature = (Rx_Data[6] << 8) | Rx_Data[7];
+  case (0x201):
+  {
+    motor.CAN_RxCpltCallback(Rx_Buffer->Data);
+  }
+  break;
+  }
+}
+
+/**
+ * @brief HAL库UART接收DMA空闲中断
+ *
+ * @param huart UART编号
+ * @param Size 长度
+ */
+void UART_Serialplot_Call_Back(uint8_t *Buffer, uint16_t Length)
+{
+  serialplot.UART_RxCpltCallback(Buffer, Length);
+  switch (serialplot.Get_Variable_Index())
+  {
+  // 电机调PID
+  case (0):
+  {
+    motor.PID_Angle.Set_K_P(serialplot.Get_Variable_Value());
+  }
+  break;
+  case (1):
+  {
+    motor.PID_Angle.Set_K_I(serialplot.Get_Variable_Value());
+  }
+  break;
+  case (2):
+  {
+    motor.PID_Angle.Set_K_D(serialplot.Get_Variable_Value());
+  }
+  break;
+  case (3):
+  {
+    motor.PID_Omega.Set_K_P(serialplot.Get_Variable_Value());
+  }
+  break;
+  case (4):
+  {
+    motor.PID_Omega.Set_K_I(serialplot.Get_Variable_Value());
+  }
+  break;
+  case (5):
+  {
+    motor.PID_Omega.Set_K_D(serialplot.Get_Variable_Value());
+  }
+  break;
   }
 }
 
 /* USER CODE END 0 */
 
 /**
- * @brief  The application entry point.
- * @retval int
- */
+  * @brief  The application entry point.
+  * @retval int
+  */
 int main(void)
 {
 
@@ -118,26 +181,51 @@ int main(void)
   MX_USART2_UART_Init();
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
+
   BSP_Init(BSP_DC24_LU_ON | BSP_DC24_LD_ON | BSP_DC24_RU_ON | BSP_DC24_RD_ON);
   CAN_Init(&hcan1, CAN_Motor_Call_Back);
-  UART_Init(&huart2, NULL, 0);
-  can_filter_mask_config(&hcan1, CAN_FILTER(13) | CAN_FIFO_1 | CAN_STDID | CAN_DATA_TYPE, 0x204, 0x7ff);
-
-  serialplot.Init(&huart2);
-
+  UART_Init(&huart2, UART_Serialplot_Call_Back, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
+  serialplot.Init(&huart2, Serialplot_Checksum_8_DISABLE, 6, (char **)Variable_Assignment_List);
+  motor.PID_Angle.Init(0.0f, 0.0f, 0.0f, 0.0f, 15.0f * PI, 15.0f * PI);
+  motor.PID_Omega.Init(0.0f, 0.0f, 0.0f, 0.0f, 2500.0f, 2500.0f);
+  motor.Init(&hcan1, Motor_DJI_ID_0x201, Motor_DJI_Control_Method_ANGLE, 1.0f);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    Tx_Encoder = Rx_Encoder;
-    Tx_Omega = Rx_Omega;
-    Tx_Torque = Rx_Torque;
-    Tx_Temperature = Rx_Temperature;
-    serialplot.Set_Data(4, &Tx_Encoder, &Tx_Omega, &Tx_Torque, &Tx_Temperature);
+    Counter++;
+    if (Counter >= 20000)
+    {
+      Counter = 0;
+      if (motor.Get_Target_Angle() == 4.0f * PI)
+      {
+        motor.Set_Target_Angle(0.0f);
+      }
+      else if (motor.Get_Target_Angle() == 0.0f)
+      {
+        motor.Set_Target_Angle(4.0f * PI);
+      }
+    }
+
+    // 串口绘图显示内容
+
+    Target_Angle = motor.Get_Target_Angle();
+    Now_Angle = motor.Get_Now_Angle();
+    Target_Omega = motor.Get_Target_Omega();
+    Now_Omega = motor.Get_Now_Omega();
+    serialplot.Set_Data(4, &Target_Angle, &Now_Angle, &Target_Omega, &Now_Omega);
     serialplot.JustFloat_Output();
 
+    // 输出数据到电机
+    motor.TIM_Calculate_PeriodElapsedCallback();
+
+    // 通信设备回调数据
+    TIM_1ms_CAN_PeriodElapsedCallback();
+    TIM_1ms_UART_PeriodElapsedCallback();
+
+    // 延时1ms
     HAL_Delay(0);
 
     /* USER CODE END WHILE */
@@ -148,22 +236,22 @@ int main(void)
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
- */
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-   */
+  */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   */
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -178,15 +266,16 @@ void SystemClock_Config(void)
   }
 
   /** Activate the Over-Drive mode
-   */
+  */
   if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
@@ -203,9 +292,9 @@ void SystemClock_Config(void)
 /* USER CODE END 4 */
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -218,12 +307,12 @@ void Error_Handler(void)
 }
 #ifdef USE_FULL_ASSERT
 /**
- * @brief  Reports the name of the source file and the source line number
- *         where the assert_param error has occurred.
- * @param  file: pointer to the source file name
- * @param  line: assert_param error line source number
- * @retval None
- */
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
